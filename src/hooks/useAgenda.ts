@@ -50,7 +50,7 @@ export const useAgenda = (fechaSeleccionada: string) => {
   };
 
   const eliminarPersonal = async (id: string) => {
-    if (id && window.confirm("¿Eliminar profesional definitivamente?")) await deleteDoc(doc(db, "personal", id));
+    if (id && window.confirm("¿Eliminar definitivamente a este profesional?")) await deleteDoc(doc(db, "personal", id));
   };
 
   const asignarTurno = async (data: Omit<ProgramacionTurno, 'id'>, semanal: boolean) => {
@@ -67,5 +67,16 @@ export const useAgenda = (fechaSeleccionada: string) => {
 
   const eliminarTurno = async (id: string) => await deleteDoc(doc(db, "turnos_programacion", id));
 
-  return { personal, turnos, resumenHistorico, registrarStaff, eliminarPersonal, asignarTurno, eliminarTurno };
+  const limpiarHistorialProfesional = async (id: string) => {
+    if(!window.confirm("¿Resetear historial de este profesional?")) return;
+    const batch = writeBatch(db);
+    const q1 = query(collection(db, "turnos_programacion"), where("idOdontologo", "==", id));
+    const q2 = query(collection(db, "turnos_programacion"), where("idAsistente", "==", id));
+    const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    s1.forEach(d => batch.delete(d.ref));
+    s2.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  };
+
+  return { personal, turnos, resumenHistorico, registrarStaff, eliminarPersonal, asignarTurno, eliminarTurno, limpiarHistorialProfesional };
 };
