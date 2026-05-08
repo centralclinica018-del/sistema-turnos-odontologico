@@ -1,86 +1,151 @@
-import { useEffect, useState } from 'react';
-import { db } from './firebase/config'; // Solo importamos la base de datos
-import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { useState } from 'react';
+import { useAgenda, type Rol, type TipoTurno } from './hooks/useAgenda';
 
-// 1. LOS TIPOS AQUÍ MISMO (Sin export, sin archivos externos)
-type Rol = 'Odontólogo' | 'Asistente' | 'Aseo' | 'Guardia';
+const THEME = { header: '#0f172a', primary: '#1e40af', secondary: '#3b82f6', bg: '#f8fafc', border: '#e2e8f0', red: '#ef4444' };
 
-interface MiembroPersonal {
-  id?: string;
-  nombre: string;
-  rol: Rol;
-  turnosAcumulados: number;
-}
+export default function App() {
+  const [tab, setTab] = useState<'agenda' | 'historial'>('agenda');
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [semanal, setSemanal] = useState(false);
+  const { personal, turnos, resumenHistorico, registrarStaff, eliminarPersonal, asignarTurno, eliminarTurno, limpiarHistorialProfesional } = useAgenda(fecha);
+  
+  const [fS, setFS] = useState({ nombre: '', rol: 'Odontólogo' as Rol });
+  const [fT, setFT] = useState({ box: '', tipo: 'Ordinario' as TipoTurno, oId: '', aId: '' });
+  const [idBorrar, setIdBorrar] = useState('');
 
-function App() {
-  const [personal, setPersonal] = useState<MiembroPersonal[]>([]);
-  const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState<Rol>('Odontólogo');
-
-  // 2. LA LÓGICA AQUÍ MISMO
-  useEffect(() => {
-    const q = query(collection(db, "personal"), orderBy("nombre", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as MiembroPersonal));
-      setPersonal(data);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nombre.trim()) return;
-    try {
-      await addDoc(collection(db, "personal"), {
-        nombre: nombre.trim(),
-        rol,
-        turnosAcumulados: 0
-      });
-      setNombre('');
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
+  const inputS = { padding: '12px', borderRadius: '6px', border: `1px solid ${THEME.border}`, width: '100%', marginBottom: '10px', fontSize: '13px' };
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#1a1a1a', color: 'white', minHeight: '100vh' }}>
-      <h1>Programación Centro Odontológico</h1>
+    <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        body, html, #root { margin: 0; padding: 0; background: #fff; overflow-x: hidden; }
+        .nav-btn { background: none; border: none; color: white; cursor: pointer; padding: 10px 25px; font-weight: bold; opacity: 0.6; border-bottom: 3px solid transparent; }
+        .nav-btn.active { opacity: 1; border-bottom: 3px solid ${THEME.secondary}; }
+        
+        .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .excel-table th { background: ${THEME.header}; color: white; text-align: center; padding: 15px; font-size: 11px; text-transform: uppercase; border: 1px solid #334155; }
+        .excel-table td { padding: 12px 15px; border: 1px solid ${THEME.border}; font-size: 13px; text-align: center; }
+        .excel-table tr:nth-child(even) { background-color: ${THEME.bg}; }
+        
+        .btn-reset { background: none; border: 1px solid ${THEME.red}; color: ${THEME.red}; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; }
+        .btn-reset:hover { background: ${THEME.red}; color: white; }
+        .btn-blue { width: 100%; padding: 12px; background: ${THEME.primary}; color: white; border: none; borderRadius: 6px; fontWeight: bold; cursor: pointer; }
+      `}</style>
       
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <input 
-          value={nombre} 
-          onChange={(e) => setNombre(e.target.value)} 
-          placeholder="Nombre del profesional" 
-          style={{ padding: '8px', borderRadius: '4px', border: 'none' }} 
-        />
-        <select 
-          value={rol} 
-          onChange={(e) => setRol(e.target.value as Rol)} 
-          style={{ padding: '8px', borderRadius: '4px' }}
-        >
-          <option value="Odontólogo">Odontólogo</option>
-          <option value="Asistente">Asistente</option>
-          <option value="Aseo">Aseo</option>
-          <option value="Guardia">Guardia</option>
-        </select>
-        <button type="submit" style={{ padding: '8px 15px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          Agregar
-        </button>
-      </form>
+      <header style={{ background: THEME.header, padding: '0 40px', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '110px' }}>
+        <h1 style={{ margin: '0 0 12px 0', fontSize: '1.4rem', fontWeight: '800' }}>CODELCO N°1</h1>
+        <nav style={{ display: 'flex', gap: '15px' }}>
+          <button className={`nav-btn ${tab === 'agenda' ? 'active' : ''}`} onClick={() => setTab('agenda')}>AGENDA DIARIA</button>
+          <button className={`nav-btn ${tab === 'historial' ? 'active' : ''}`} onClick={() => setTab('historial')}>HISTORIAL PROFESIONAL</button>
+        </nav>
+      </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-        {personal.map(p => (
-          <div key={p.id} style={{ padding: '15px', backgroundColor: '#333', borderRadius: '8px', border: '1px solid #444' }}>
-            <strong style={{ display: 'block', fontSize: '1.1em' }}>{p.nombre}</strong>
-            <small style={{ color: '#aaa' }}>{p.rol}</small>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: tab === 'agenda' ? '380px 1fr' : '1fr', flex: 1 }}>
+        {tab === 'agenda' && (
+          <aside style={{ background: THEME.bg, padding: '25px', borderRight: `1px solid ${THEME.border}`, overflowY: 'auto' }}>
+            <section style={{ marginBottom: '30px', paddingBottom: '20px', borderBottom: `1px solid ${THEME.border}` }}>
+              <h2 style={{ fontSize: '0.7rem', color: THEME.primary, fontWeight: '900', marginBottom: '15px', textTransform: 'uppercase' }}>Gestión Personal</h2>
+              <input style={inputS} placeholder="Nombre completo" value={fS.nombre} onChange={e => setFS({...fS, nombre: e.target.value})} />
+              <select style={inputS} value={fS.rol} onChange={e => setFS({...fS, rol: e.target.value as Rol})}><option value="Odontólogo">Odontólogo</option><option value="Asistente">Asistente</option></select>
+              <button className="btn-blue" onClick={() => { registrarStaff(fS.nombre, fS.rol); setFS({...fS, nombre: ''}); }} style={{ marginBottom: '15px' }}>Guardar</button>
+              
+              <select style={inputS} value={idBorrar} onChange={e => setIdBorrar(e.target.value)}>
+                <option value="">Seleccionar para borrar...</option>
+                {personal.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+              <button onClick={() => eliminarPersonal(idBorrar)} style={{ width: '100%', padding: '12px', background: 'none', border: `1px solid ${THEME.red}`, color: THEME.red, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Eliminar Definitivamente</button>
+            </section>
+
+            <section>
+              <h2 style={{ fontSize: '0.7rem', color: THEME.primary, fontWeight: '900', marginBottom: '15px', textTransform: 'uppercase' }}>Programación</h2>
+              <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={inputS} />
+              <label style={{ display: 'flex', gap: '10px', background: '#e2e8f0', padding: '12px', borderRadius: '6px', marginBottom: '10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                <input type="checkbox" checked={semanal} onChange={e => setSemanal(e.target.checked)} /> ASIGNAR SEMANA COMPLETA
+              </label>
+              <select style={inputS} value={fT.box} onChange={e => setFT({...fT, box: e.target.value})}><option value="">Box...</option>{[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>Box {i+1}</option>)}</select>
+              <select style={inputS} value={fT.tipo} onChange={e => setFT({...fT, tipo: e.target.value as TipoTurno})}><option value="Ordinario">Ordinario</option><option value="Extensión">Extensión</option><option value="Urgencia Sábado">Urgencia Sábado</option><option value="Turno Ético">Turno Ético</option></select>
+              <select style={inputS} value={fT.oId} onChange={e => setFT({...fT, oId: e.target.value})}><option value="">Odontólogo...</option>{personal.filter(p => p.rol === 'Odontólogo').map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
+              <select style={inputS} value={fT.aId} onChange={e => setFT({...fT, aId: e.target.value})}><option value="">Asistente...</option>{personal.filter(p => p.rol === 'Asistente').map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
+              <button className="btn-blue" onClick={() => { 
+                const o = personal.find(p => p.id === fT.oId); 
+                const a = personal.find(p => p.id === fT.aId); 
+                if(o && a && fT.box) { 
+                  asignarTurno({fecha, box: fT.box, tipo: fT.tipo, idOdontologo: o.id!, nombreOdontologo: o.nombre, idAsistente: a.id!, nombreAsistente: a.nombre}, semanal); 
+                  setFT({...fT, box: '', oId: '', aId: ''}); 
+                } 
+              }}>Confirmar Turno</button>
+            </section>
+          </aside>
+        )}
+
+        <main style={{ padding: '40px', overflowY: 'auto' }}>
+          {tab === 'agenda' ? (
+            <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+              <table className="excel-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '80px' }}>Box</th>
+                    <th>Tipo</th>
+                    <th>Odontólogo</th>
+                    <th>Asistente</th>
+                    <th style={{ width: '80px' }}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {turnos.length > 0 ? (
+                    turnos.sort((a,b) => Number(a.box) - Number(b.box)).map(t => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 'bold', color: THEME.primary }}>{t.box}</td>
+                        <td style={{ fontSize: '11px', fontWeight: 'bold' }}>{t.tipo}</td>
+                        <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{t.nombreOdontologo}</td>
+                        <td style={{ textAlign: 'left' }}>{t.nombreAsistente}</td>
+                        <td>
+                          <button onClick={() => eliminarTurno(t.id!)} style={{ background: 'none', border: 'none', color: THEME.red, cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}>✕</button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={5} style={{ padding: '30px', color: '#94a3b8' }}>Sin turnos para esta fecha</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+              <table className="excel-table">
+                <thead>
+                  <tr>
+                    <th style={{textAlign: 'left'}}>Nombre Profesional</th>
+                    <th>Ord</th>
+                    <th>Ext</th>
+                    <th>Sáb</th>
+                    <th>Ético</th>
+                    <th style={{background: THEME.primary}}>Total</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {personal.map(p => { 
+                    const h = resumenHistorico[p.id!] || { Total: 0, Ordinario: 0, Extensión: 0, "Urgencia Sábado": 0, "Turno Ético": 0 };
+                    return (
+                      <tr key={p.id}>
+                        <td style={{textAlign: 'left', fontWeight: '700'}}>{p.nombre} ({p.rol[0]})</td>
+                        <td>{h.Ordinario}</td>
+                        <td>{h.Extensión}</td>
+                        <td>{h["Urgencia Sábado"]}</td>
+                        <td>{h["Turno Ético"]}</td>
+                        <td style={{fontWeight: '900', color: THEME.primary}}>{h.Total}</td>
+                        <td><button className="btn-reset" onClick={() => limpiarHistorialProfesional(p.id!)}>Reset</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
 }
-
-export default App;
