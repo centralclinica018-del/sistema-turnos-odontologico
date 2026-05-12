@@ -1,82 +1,91 @@
-import { useState, useEffect } from 'react';
-import { db } from "../firebase/config";
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, where, addDoc, getDocs, writeBatch } from "firebase/firestore";
+import { useState, useEffect, useMemo } from 'react';
+import { db } from '../firebase'; 
+import { 
+  collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc 
+} from 'firebase/firestore'; 
+import type { Personal, Dupla, Turno, Rol } from '../types';
 
-export type Rol = 'Odontólogo' | 'Asistente';
-export type TipoTurno = 'Ordinario' | 'Extensión' | 'Urgencia Sábado' | 'Turno Ético';
-
-export interface MiembroPersonal { id?: string; nombre: string; rol: Rol; }
-export interface ProgramacionTurno {
-  id?: string; fecha: string; tipo: TipoTurno; box: string;
-  idOdontologo: string; nombreOdontologo: string;
-  idAsistente: string; nombreAsistente: string;
-}
-
-export const useAgenda = (fechaSeleccionada: string) => {
-  const [personal, setPersonal] = useState<MiembroPersonal[]>([]);
-  const [turnos, setTurnos] = useState<ProgramacionTurno[]>([]);
-  const [resumenHistorico, setResumenHistorico] = useState<any>({});
+export const useAgenda = (fInicio: string, fFin: string) => {
+  const [personal, setPersonal] = useState<Personal[]>([]);
+  const [duplas, setDuplas] = useState<Dupla[]>([]);
+  const [allTurnos, setAllTurnos] = useState<Turno[]>([]);
 
   useEffect(() => {
-    const unsubP = onSnapshot(query(collection(db, "personal"), orderBy("nombre", "asc")), (snap) => {
-      setPersonal(snap.docs.map(d => ({ id: d.id, ...d.data() } as MiembroPersonal)));
+    const unsubP = onSnapshot(collection(db, 'personal'), (s) => 
+      setPersonal(s.docs.map(d => ({ id: d.id, ...d.data() } as Personal))));
+    const unsubD = onSnapshot(collection(db, 'duplas'), (s) => 
+      setDuplas(s.docs.map(d => ({ id: d.id, ...d.data() } as Dupla))));
+    const unsubT = onSnapshot(collection(db, 'turnos'), (s) => 
+      setAllTurnos(s.docs.map(d => ({ id: d.id, ...d.data() } as Turno))));
+    return () => { unsubP(); unsubD(); unsubT(); };
+  }, []);
+
+  const vincularDatos = (lista: Turno[]) => lista.map(t => {
+    const d = duplas.find(dup => dup.oId === t.idOdontologo || dup.id === t.idOdontologo);
+    return { 
+      ...t, 
+      nombreO: t.nombreO || d?.oNombre || 'N/A', 
+      nombreA: t.nombreA || d?.aNombre || 'N/A', 
+      box: t.box || d?.boxPreferido || '1' 
+    };
+  });
+
+  const turnos = useMemo(() => vincularDatos(allTurnos.filter(t => t.fecha >= fInicio && t.fecha <= fFin)), [allTurnos, fInicio, fFin, duplas]);
+  const turnosAnuales = useMemo(() => vincularDatos([...allTurnos].sort((a, b) => a.fecha.localeCompare(b.fecha))), [allTurnos, duplas]);
+
+  const resumenHistorico = useMemo(() => {
+    return personal.map(p => {
+      const susTurnos = allTurnos.filter(t => t.idOdontologo === p.id || t.idAsistente === p.id);
+      const tipos: Record<string, number> = {};
+      susTurnos.forEach(t => { tipos[t.tipo] = (tipos[t.tipo] || 0) + 1; });
+      return { id: p.id, nombre: p.nombre, total: susTurnos.length, tipos };
     });
+  }, [personal, allTurnos]);
 
-    const unsubT = onSnapshot(query(collection(db, "turnos_programacion"), where("fecha", "==", fechaSeleccionada)), (snap) => {
-      setTurnos(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProgramacionTurno)));
-    });
+  const generarAñoCompleto = async (listaDuplas: Dupla[]) => {
+    if (listaDuplas.length === 0) return alert("Crea las duplas primero en Gestión.");
+    const año = 2026;
+    let fecha = new Date(año, 0, 1);
+    let dIdx = 0;
 
-    const unsubH = onSnapshot(collection(db, "turnos_programacion"), (snap) => {
-      const nuevoConteo: any = {};
-      snap.forEach(doc => {
-        const data = doc.data();
-        const tipo = data.tipo as TipoTurno;
-        [data.idOdontologo, data.idAsistente].forEach(id => {
-          if (id) {
-            if (!nuevoConteo[id]) nuevoConteo[id] = { Total: 0, Ordinario: 0, Extensión: 0, "Urgencia Sábado": 0, "Turno Ético": 0 };
-            nuevoConteo[id].Total++;
-            if (nuevoConteo[id][tipo] !== undefined) nuevoConteo[id][tipo]++;
-          }
-        });
-      });
-      setResumenHistorico(nuevoConteo);
-    });
+    try {
+      while (fecha.getFullYear() === año) {
+        const dia = fecha.getDay();
+        if (dia === 1 && fecha > new Date(año, 0, 1)) dIdx = (dIdx + 1) % listaDuplas.length;
 
-    return () => { unsubP(); unsubT(); unsubH(); };
-  }, [fechaSeleccionada]);
-
-  const registrarStaff = async (nombre: string, rol: Rol) => {
-    if (nombre.trim()) await addDoc(collection(db, "personal"), { nombre: nombre.trim(), rol });
+        if (dia !== 0) {
+          const d = listaDuplas[dIdx];
+          await addDoc(collection(db, 'turnos'), {
+            fecha: fecha.toISOString().split('T')[0],
+            tipo: dia === 6 ? "Fin de Semana" : "Extensión",
+            idOdontologo: d.oId,
+            nombreO: d.oNombre,
+            idAsistente: d.aId,
+            nombreA: d.aNombre,
+            box: d.boxPreferido || '1',
+            estadoO: 'Presente',
+            estadoA: 'Presente'
+          });
+        }
+        fecha.setDate(fecha.getDate() + 1);
+      }
+      alert("Calendario 2026 generado.");
+    } catch (e) { alert("Error: " + e); }
   };
 
-  const eliminarPersonal = async (id: string) => {
-    if (id && window.confirm("¿Eliminar definitivamente a este profesional?")) await deleteDoc(doc(db, "personal", id));
-  };
-
-  const asignarTurno = async (data: Omit<ProgramacionTurno, 'id'>, semanal: boolean) => {
-    if (!semanal) return await addDoc(collection(db, "turnos_programacion"), { ...data });
-    const base = new Date(data.fecha + 'T12:00:00');
-    const lunes = new Date(base);
-    lunes.setDate(base.getDate() - (base.getDay() === 0 ? 6 : base.getDay() - 1));
-    for (let i = 0; i < 5; i++) {
-      const dia = new Date(lunes);
-      dia.setDate(lunes.getDate() + i);
-      await addDoc(collection(db, "turnos_programacion"), { ...data, fecha: dia.toISOString().split('T')[0] });
+  return {
+    personal, duplas, turnos, turnosAnuales, resumenHistorico, generarAñoCompleto,
+    registrarStaff: (n: string, r: Rol) => addDoc(collection(db, 'personal'), { nombre: n, rol: r }),
+    eliminarPersonal: (id: string) => deleteDoc(doc(db, 'personal', id)),
+    crearDupla: (oI: string, oN: string, aI: string, aN: string, b: string) => 
+      addDoc(collection(db, 'duplas'), { oId: oI, oNombre: oN, aId: aI, aNombre: aN, boxPreferido: b }),
+    eliminarDupla: (id: string) => deleteDoc(doc(db, 'duplas', id)),
+    asignarTurnoRango: (data: any) => addDoc(collection(db, 'turnos'), data),
+    actualizarTurno: (id: string, c: string, v: string) => updateDoc(doc(db, 'turnos', id), { [c]: v }),
+    eliminarTurno: (id: string) => deleteDoc(doc(db, 'turnos', id)),
+    limpiarProgramacionAnual: async () => {
+      if(!confirm("¿Borrar todo?")) return;
+      for (const t of allTurnos) { await deleteDoc(doc(db, 'turnos', t.id)); }
     }
   };
-
-  const eliminarTurno = async (id: string) => await deleteDoc(doc(db, "turnos_programacion", id));
-
-  const limpiarHistorialProfesional = async (id: string) => {
-    if(!window.confirm("¿Resetear historial de este profesional?")) return;
-    const batch = writeBatch(db);
-    const q1 = query(collection(db, "turnos_programacion"), where("idOdontologo", "==", id));
-    const q2 = query(collection(db, "turnos_programacion"), where("idAsistente", "==", id));
-    const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-    s1.forEach(d => batch.delete(d.ref));
-    s2.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-  };
-
-  return { personal, turnos, resumenHistorico, registrarStaff, eliminarPersonal, asignarTurno, eliminarTurno, limpiarHistorialProfesional };
 };
