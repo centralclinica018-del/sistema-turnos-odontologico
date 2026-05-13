@@ -7,16 +7,18 @@ import { AgendaView } from './components/AgendaView';
 import { AnualView } from './components/AnualView';
 import { ReportesView } from './components/ReportesView';
 import { GestionView } from './components/GestionView';
+import { ReporteNovedadesView } from './components/ReporteNovedadesView'; // Importamos el nuevo componente
 
 export default function App() {
+  
   // Estados para el rango de fechas de la vista de Agenda
   const [fInicio, setFInicio] = useState('2026-05-12');
   const [fFin, setFFin] = useState('2026-05-16');
   
-  // Control de pestañas
-  const [tab, setTab] = useState<'agenda' | 'anual' | 'historial' | 'gestion'>('agenda');
+  // Control de pestañas - Añadimos 'novedades' al tipo
+  const [tab, setTab] = useState<'agenda' | 'anual' | 'historial' | 'gestion' | 'novedades'>('agenda');
 
-  // Hook principal con toda la lógica de Firebase y cálculos
+  // Hook principal
   const { 
     personal, duplas, turnos, turnosAnuales, resumenHistorico,
     actualizarTurno, registrarStaff, eliminarPersonal, crearDupla,
@@ -67,6 +69,8 @@ export default function App() {
           {navBtn('agenda', 'Agenda', '📅')}
           {navBtn('anual', 'Plan Anual', '📊')}
           {navBtn('historial', 'Reportes', '📄')}
+          {/* NUEVA PESTAÑA DE NOVEDADES */}
+          {navBtn('novedades', 'Inasistencias', '🚨')}
           {navBtn('gestion', 'Gestión', '⚙️')}
         </nav>
       </header>
@@ -104,6 +108,11 @@ export default function App() {
             personal={personal} 
             resumenHistorico={resumenHistorico} 
           />
+        )}
+
+        {/* NUEVA VISTA: Reporte de Inasistencias y Licencias */}
+        {tab === 'novedades' && (
+          <ReporteNovedadesView turnos={turnos} />
         )}
 
         {/* Vista de Configuración de Staff y Duplas */}

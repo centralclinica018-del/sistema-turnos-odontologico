@@ -42,6 +42,23 @@ export const useAgenda = (fInicio: string, fFin: string) => {
     });
   }, [personal, allTurnos]);
 
+  // MEJORA: Función para procesar el rango de fechas correctamente
+  const asignarTurnoRango = async (inicio: string, fin: string, data: any) => {
+    let actual = new Date(inicio + 'T12:00:00');
+    const tope = new Date(fin + 'T12:00:00');
+
+    while (actual <= tope) {
+      const fechaStr = actual.toISOString().split('T')[0];
+      await addDoc(collection(db, 'turnos'), {
+        ...data,
+        fecha: fechaStr,
+        estadoO: 'Presente',
+        estadoA: 'Presente'
+      });
+      actual.setDate(actual.getDate() + 1);
+    }
+  };
+
   const generarAñoCompleto = async (listaDuplas: Dupla[]) => {
     if (listaDuplas.length === 0) return alert("Crea las duplas primero en Gestión.");
     const año = 2026;
@@ -75,12 +92,12 @@ export const useAgenda = (fInicio: string, fFin: string) => {
 
   return {
     personal, duplas, turnos, turnosAnuales, resumenHistorico, generarAñoCompleto,
+    asignarTurnoRango, // Exportamos la versión corregida
     registrarStaff: (n: string, r: Rol) => addDoc(collection(db, 'personal'), { nombre: n, rol: r }),
     eliminarPersonal: (id: string) => deleteDoc(doc(db, 'personal', id)),
     crearDupla: (oI: string, oN: string, aI: string, aN: string, b: string) => 
       addDoc(collection(db, 'duplas'), { oId: oI, oNombre: oN, aId: aI, aNombre: aN, boxPreferido: b }),
     eliminarDupla: (id: string) => deleteDoc(doc(db, 'duplas', id)),
-    asignarTurnoRango: (data: any) => addDoc(collection(db, 'turnos'), data),
     actualizarTurno: (id: string, c: string, v: string) => updateDoc(doc(db, 'turnos', id), { [c]: v }),
     eliminarTurno: (id: string) => deleteDoc(doc(db, 'turnos', id)),
     limpiarProgramacionAnual: async () => {
