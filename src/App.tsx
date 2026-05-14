@@ -7,7 +7,7 @@ import { AgendaView } from './components/AgendaView';
 import { AnualView } from './components/AnualView';
 import { ReportesView } from './components/ReportesView';
 import { GestionView } from './components/GestionView';
-import { ReporteNovedadesView } from './components/ReporteNovedadesView'; // Importamos el nuevo componente
+import { ReporteNovedadesView } from './components/ReporteNovedadesView'; 
 
 export default function App() {
   
@@ -15,7 +15,7 @@ export default function App() {
   const [fInicio, setFInicio] = useState('2026-05-12');
   const [fFin, setFFin] = useState('2026-05-16');
   
-  // Control de pestañas - Añadimos 'novedades' al tipo
+  // Control de pestañas
   const [tab, setTab] = useState<'agenda' | 'anual' | 'historial' | 'gestion' | 'novedades'>('agenda');
 
   // Hook principal
@@ -34,7 +34,8 @@ export default function App() {
         background: 'none', border: 'none', padding: '10px 20px', cursor: 'pointer', 
         color: tab === t ? UI.primary : UI.text, fontWeight: '700',
         borderBottom: tab === t ? `3px solid ${UI.primary}` : 'none',
-        transition: 'all 0.3s'
+        transition: 'all 0.3s',
+        fontSize: '14px'
       }}
     >
       {icon} {label}
@@ -55,21 +56,23 @@ export default function App() {
         top: 0,
         zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        {/* TITULO ACTUALIZADO: Centro Odontológico Sindicato N°1 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ 
-            width: '35px', height: '35px', background: UI.primary, borderRadius: '6px', 
+            width: '32px', height: '32px', background: UI.primary, borderRadius: '6px', 
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800' 
           }}>
-            D
+            S
           </div>
-          <div style={{ fontSize: '18px', fontWeight: '800', color: UI.text }}>CENTRO DENTAL</div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: UI.text, letterSpacing: '0.5px' }}>
+            CENTRO ODONTOLÓGICO SINDICATO N°1
+          </div>
         </div>
         
         <nav style={{ display: 'flex', gap: '5px' }}>
           {navBtn('agenda', 'Agenda', '📅')}
           {navBtn('anual', 'Plan Anual', '📊')}
           {navBtn('historial', 'Reportes', '📄')}
-          {/* NUEVA PESTAÑA DE NOVEDADES */}
           {navBtn('novedades', 'Inasistencias', '🚨')}
           {navBtn('gestion', 'Gestión', '⚙️')}
         </nav>
@@ -110,7 +113,7 @@ export default function App() {
           />
         )}
 
-        {/* NUEVA VISTA: Reporte de Inasistencias y Licencias */}
+        {/* Reporte de Inasistencias y Licencias */}
         {tab === 'novedades' && (
           <ReporteNovedadesView turnos={turnos} />
         )}

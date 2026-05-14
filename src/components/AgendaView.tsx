@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { UI, styles } from '../theme';
 import type { Personal, Turno, Dupla } from '../types';
 
-// Lista de motivos estandarizados para el centro dental
 const OPCIONES_CAMBIO = [
   "Licencia Médica",
   "Permiso Administrativo",
@@ -32,43 +31,35 @@ export const AgendaView = ({
 }: Props) => {
   const [fAsig, setFAsig] = useState({ inicio: '2026-05-12', fin: '2026-05-16' });
   const [fT, setFT] = useState({ box: '1', oId: '', aId: '', tipo: 'Ordinario' as any });
+  
+  // --- NUEVOS ESTADOS PARA FILTROS ---
+  const [filtroO, setFiltroO] = useState('');
+  const [filtroA, setFiltroA] = useState('');
 
   const turnosAgrupados = turnos.reduce((acc: {[key: string]: any}, t) => {
     const clave = `${t.fecha}-${t.box}`;
     acc[clave] = t; 
     return acc;
   }, {});
-  const listaTurnos = Object.values(turnosAgrupados).sort((a, b) => a.fecha.localeCompare(b.fecha));
 
-  const handleCargarRango = () => {
-    const o = personal.find(p => p.id === fT.oId);
-    const a = personal.find(p => p.id === fT.aId);
-
-    if (o && a) {
-      asignarTurnoRango(fAsig.inicio, fAsig.fin, { 
-        idOdontologo: o.id, 
-        nombreO: o.nombre, 
-        idAsistente: a.id, 
-        nombreA: a.nombre, 
-        box: fT.box, 
-        tipo: fT.tipo,
-        esCambio: false 
-      });
-    } else {
-      alert("Por favor selecciona Odontólogo y Asistente");
-    }
-  };
+  // --- LÓGICA DE FILTRADO ---
+  const listaTurnos = Object.values(turnosAgrupados)
+    .filter(t => {
+      const cumpleO = filtroO === '' || t.idOdontologo === filtroO;
+      const cumpleA = filtroA === '' || t.idAsistente === filtroA;
+      return cumpleO && cumpleA;
+    })
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   const manejarCambioConMotivo = (t: any, pId: string, campoId: string, campoNombre: string) => {
-    const pNuevo = personal.find(pers => pers.id === pId);
+    const pNuevo = personal.find(pers => String(pers.id) === String(pId));
     if (!pNuevo) return;
 
-    const idActual = campoId === 'idOdontologo' ? t.idOdontologo : t.idAsistente;
-    const nombreActual = campoId === 'idOdontologo' ? t.nombreO : t.nombreA;
+    const idActual = String(t[campoId]);
+    const nombreActual = t[campoNombre];
     
-    if (pId === idActual) return;
+    if (String(pId) === idActual) return;
 
-    // 1. Motivo del cambio
     const mensajeMenu = `¿Por qué reemplaza a ${nombreActual}?\n\n` + 
                         OPCIONES_CAMBIO.map((opt, i) => `${i + 1}. ${opt}`).join('\n');
     
@@ -83,13 +74,13 @@ export const AgendaView = ({
         motivoFinal = detalle || "Otro motivo";
       }
 
-      // 2. Registro de quién realiza la acción (Autoría)
       const operador = prompt("Nombre del administrativo que autoriza el cambio:", "Admin");
 
       if (operador) {
         if (!t.esCambio) {
           actualizarTurno(t.id, 'nombreTitularOriginal', nombreActual);
           actualizarTurno(t.id, 'idTitularOriginal', idActual);
+          actualizarTurno(t.id, 'rolTitular', campoId === 'idOdontologo' ? 'Odontólogo' : 'Asistente');
         }
 
         actualizarTurno(t.id, campoId, pNuevo.id);
@@ -140,11 +131,56 @@ export const AgendaView = ({
             ))}
           </select>
 
-          <button onClick={handleCargarRango} style={{ ...styles.button, width: '100%' }}>CARGAR RANGO</button>
+          <button onClick={() => {
+             const o = personal.find(p => p.id === fT.oId);
+             const a = personal.find(p => p.id === fT.aId);
+             if (o && a) {
+               asignarTurnoRango(fAsig.inicio, fAsig.fin, { 
+                 idOdontologo: o.id, nombreO: o.nombre, idAsistente: a.id, nombreA: a.nombre, box: fT.box, tipo: fT.tipo, esCambio: false 
+               });
+             } else { alert("Selecciona personal"); }
+          }} style={{ ...styles.button, width: '100%' }}>CARGAR RANGO</button>
         </div>
       </aside>
 
       <div style={{ background: UI.white, borderRadius: '8px', border: `1px solid ${UI.border}`, overflow: 'hidden' }}>
+        
+        {/* BARRA DE FILTROS SOBRE LA TABLA */}
+        <div style={{ background: '#f1f1f1', padding: '15px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>FILTRAR TABLA:</span>
+          
+          <select 
+            style={{ ...styles.input, marginBottom: 0, width: '200px', fontSize: '12px' }} 
+            value={filtroO} 
+            onChange={e => setFiltroO(e.target.value)}
+          >
+            <option value="">Todos los Odontólogos</option>
+            {personal.filter(p => String(p.rol).includes('Odontólogo')).map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
+
+          <select 
+            style={{ ...styles.input, marginBottom: 0, width: '200px', fontSize: '12px' }} 
+            value={filtroA} 
+            onChange={e => setFiltroA(e.target.value)}
+          >
+            <option value="">Todos los Asistentes</option>
+            {personal.filter(p => String(p.rol).includes('Asistente')).map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
+
+          {(filtroO || filtroA) && (
+            <button 
+              onClick={() => { setFiltroO(''); setFiltroA(''); }}
+              style={{ background: 'none', border: 'none', color: UI.danger, cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ background: '#ccd5ae' }}>
             <tr style={{ textAlign: 'left', fontSize: '12px' }}>
@@ -155,50 +191,53 @@ export const AgendaView = ({
             </tr>
           </thead>
           <tbody>
-            {listaTurnos.map((t: any) => (
-              <tr key={t.id} style={{ borderBottom: `1px solid ${UI.border}`, background: t.esCambio ? '#fff9f0' : 'none' }}>
-                <td style={{ padding: '15px', fontWeight: 'bold' }}>{t.fecha}</td>
-                <td style={{ padding: '15px' }}>
-                  {t.tipo} <br/><small>Box {t.box}</small>
-                  {t.esCambio && (
-                    <div style={{ fontSize: '10px', color: '#d35400', marginTop: '5px', padding: '5px', border: '1px dashed #e67e22', borderRadius: '4px' }}>
-                      <strong>Motivo:</strong> {t.motivoCambio} <br/>
-                      <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>Orig: {t.nombreTitularOriginal}</span> <br/>
-                      <span style={{ color: '#666', fontStyle: 'italic' }}>Modificado por: {t.quienCambio}</span>
-                    </div>
-                  )}
-                </td>
-                <td style={{ padding: '15px' }}>
-                  <div style={{ display: 'flex', gap: '20px' }}>
-                    <div style={{ borderLeft: t.esCambio ? '3px solid #e67e22' : 'none', paddingLeft: t.esCambio ? '8px' : '0' }}>
+            {listaTurnos.length > 0 ? (
+              listaTurnos.map((t: any) => (
+                <tr key={t.id} style={{ borderBottom: `1px solid ${UI.border}`, background: t.esCambio ? '#fff9f0' : 'none' }}>
+                  <td style={{ padding: '15px', fontWeight: 'bold' }}>{t.fecha}</td>
+                  <td style={{ padding: '15px' }}>
+                    {t.tipo} <br/><small>Box {t.box}</small>
+                    {t.esCambio && (
+                      <div style={{ fontSize: '10px', color: '#d35400', marginTop: '5px', padding: '5px', border: '1px dashed #e67e22', borderRadius: '4px' }}>
+                        <strong>Motivo:</strong> {t.motivoCambio} <br/>
+                        <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>Orig: {t.nombreTitularOriginal}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '15px' }}>
+                    <div style={{ display: 'flex', gap: '20px' }}>
                       <select 
                         value={t.idOdontologo} 
                         onChange={e => manejarCambioConMotivo(t, e.target.value, 'idOdontologo', 'nombreO')}
-                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: UI.primary }}
+                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', color: UI.primary }}
                       >
                         {personal.filter(p => String(p.rol).includes('Odontólogo')).map(p => (
                           <option key={p.id} value={p.id}>{p.nombre}</option>
                         ))}
                       </select>
-                    </div>
-                    <div style={{ borderLeft: t.esCambio ? '3px solid #e67e22' : 'none', paddingLeft: t.esCambio ? '8px' : '0' }}>
                       <select 
                         value={t.idAsistente} 
                         onChange={e => manejarCambioConMotivo(t, e.target.value, 'idAsistente', 'nombreA')}
-                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: UI.primary }}
+                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', color: UI.primary }}
                       >
                         {personal.filter(p => String(p.rol).includes('Asistente')).map(p => (
                           <option key={p.id} value={p.id}>{p.nombre}</option>
                         ))}
                       </select>
                     </div>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <button onClick={() => eliminarTurno(t.id)} style={{ color: UI.danger, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button onClick={() => eliminarTurno(t.id)} style={{ color: UI.danger, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
+                  No se encontraron turnos con los filtros seleccionados.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
