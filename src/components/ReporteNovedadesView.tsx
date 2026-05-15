@@ -91,15 +91,14 @@ export const ReporteNovedadesView = ({ turnos }: Props) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', paddingBottom: '40px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0, color: UI.primary }}>Gestión de Asistencia e Incidencias</h2>
-          <p style={{ margin: 0, color: '#666' }}>Historial de reemplazos y novedades.</p>
+          <h2 style={{ margin: 0, color: UI.primary, fontSize: '24px' }}>Gestión de Asistencia e Incidencias</h2>
+          <p style={{ margin: 0, color: '#666' }}>Historial detallado de reemplazos y novedades administrativas.</p>
         </div>
         
-        {/* --- AQUÍ ESTÁ EL BOTÓN QUE BUSCAS --- */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
             <button 
                 onClick={exportarExcel}
                 style={{ 
@@ -119,23 +118,24 @@ export const ReporteNovedadesView = ({ turnos }: Props) => {
                 📊 EXPORTAR A EXCEL
             </button>
             
-            <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '24px', fontWeight: 'bold', color: UI.danger }}>
+            <div style={{ textAlign: 'center', minWidth: '80px' }}>
+                <span style={{ fontSize: '28px', fontWeight: 'bold', color: UI.danger, display: 'block', lineHeight: '1' }}>
                   {reporteData.reduce((sum, [_, data]: [any, any]) => sum + data.total, 0)}
                 </span>
-                <br /><small style={{ color: '#888', fontWeight: 'bold' }}>TOTAL</small>
+                <small style={{ color: '#888', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px' }}>Total Fallas</small>
             </div>
         </div>
       </header>
 
       {/* BARRA DE FILTROS */}
-      <div style={{ ...styles.card, padding: '15px', background: '#f1f1f1', display: 'flex', gap: '10px' }}>
-        <select value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ ...styles.input, marginBottom: 0, flex: 2 }}>
-          <option value="">-- Seleccionar Funcionario --</option>
+      <div style={{ ...styles.card, padding: '15px', background: '#f8f9fa', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>FILTRAR POR:</span>
+        <select value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ ...styles.input, marginBottom: 0, flex: 2, fontSize: '13px' }}>
+          <option value="">-- Todos los Funcionarios --</option>
           {listaFuncionarios.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
 
-        <select value={mesFiltro} onChange={(e) => setMesFiltro(e.target.value)} style={{ ...styles.input, marginBottom: 0, flex: 1 }}>
+        <select value={mesFiltro} onChange={(e) => setMesFiltro(e.target.value)} style={{ ...styles.input, marginBottom: 0, flex: 1, fontSize: '13px' }}>
           <option value="">Todos los Meses</option>
           {MESES.map(m => <option key={m.val} value={m.val}>{m.nombre}</option>)}
         </select>
@@ -143,41 +143,57 @@ export const ReporteNovedadesView = ({ turnos }: Props) => {
         {(busqueda || mesFiltro) && (
           <button 
             onClick={() => { setBusqueda(''); setMesFiltro(''); }}
-            style={{ background: UI.danger, color: 'white', border: 'none', padding: '0 15px', borderRadius: '5px', cursor: 'pointer' }}
+            style={{ background: '#666', color: 'white', border: 'none', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+            title="Limpiar filtros"
           >
-            X
+            ✕
           </button>
         )}
       </div>
 
       {/* CUERPO DEL REPORTE */}
       {reporteData.length === 0 ? (
-        <div style={{ ...styles.card, textAlign: 'center', padding: '50px', color: '#bbb' }}>
-          <h3>No hay datos para mostrar</h3>
+        <div style={{ ...styles.card, textAlign: 'center', padding: '60px', color: '#bbb', borderStyle: 'dashed' }}>
+          <h3 style={{ fontWeight: 'normal' }}>No se encontraron registros con los filtros seleccionados</h3>
         </div>
       ) : (
         reporteData.map(([nombre, data]: [any, any]) => (
-          <div key={nombre} style={{ ...styles.card, padding: '0', overflow: 'hidden', marginBottom: '20px' }}>
-            <div style={{ background: '#f8f9fa', padding: '20px', borderBottom: `1px solid ${UI.border}`, display: 'flex', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>{nombre}</h3>
-              <div style={{ background: UI.danger, color: 'white', padding: '5px 15px', borderRadius: '5px' }}>
-                {data.total} FALLAS
+          <div key={nombre} style={{ ...styles.card, padding: '0', overflow: 'hidden', marginBottom: '25px', border: `1px solid ${UI.border}`, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            
+            {/* Cabecera de Tarjeta de Funcionario */}
+            <div style={{ background: '#fff', padding: '15px 20px', borderBottom: `1px solid ${UI.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', color: UI.primary, letterSpacing: '0.5px' }}>
+                {nombre.toUpperCase()}
+              </h3>
+              <div style={{ background: UI.danger, color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
+                {data.total} {data.total === 1 ? 'INCIDENCIA' : 'INCIDENCIAS'}
               </div>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+
+            {/* Tabla Alineada */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
-                    <tr style={{ textAlign: 'left', background: '#fafafa', fontSize: '12px', color: '#777' }}>
-                        <th style={{ padding: '12px 20px' }}>FECHA</th>
-                        <th style={{ padding: '12px 20px' }}>MOTIVO</th>
-                        <th style={{ padding: '12px 20px' }}>REEMPLAZO</th>
+                    <tr style={{ textAlign: 'left', background: '#fafafa' }}>
+                        <th style={{ padding: '12px 20px', fontSize: '11px', color: '#888', width: '20%', borderBottom: `1px solid ${UI.border}` }}>FECHA</th>
+                        <th style={{ padding: '12px 20px', fontSize: '11px', color: '#888', width: '35%', borderBottom: `1px solid ${UI.border}` }}>MOTIVO DE INASISTENCIA</th>
+                        <th style={{ padding: '12px 20px', fontSize: '11px', color: '#888', width: '45%', borderBottom: `1px solid ${UI.border}` }}>REEMPLAZADO POR / AUTORIZA</th>
                     </tr>
                 </thead>
                 <tbody>
                     {data.detalle.map((item: any, idx: number) => (
-                        <tr key={idx} style={{ borderTop: '1px solid #eee' }}>
-                            <td style={{ padding: '12px 20px', fontWeight: 'bold' }}>{item.fecha}</td>
-                            <td style={{ padding: '12px 20px', color: '#d35400' }}>{item.motivo}</td>
-                            <td style={{ padding: '12px 20px', color: UI.primary }}>{item.reemplazo}</td>
+                        <tr key={idx} style={{ borderBottom: idx === data.detalle.length - 1 ? 'none' : '1px solid #f1f1f1' }}>
+                            <td style={{ padding: '15px 20px', fontSize: '13px', fontWeight: '600', color: '#333' }}>
+                              {item.fecha}
+                            </td>
+                            <td style={{ padding: '15px 20px', fontSize: '13px' }}>
+                              <span style={{ color: '#d35400', fontWeight: '500' }}>• {item.motivo || 'No especificado'}</span>
+                            </td>
+                            <td style={{ padding: '15px 20px', fontSize: '13px' }}>
+                              <div style={{ color: UI.primary, fontWeight: 'bold' }}>{item.reemplazo || 'Sin reemplazo'}</div>
+                              <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                                Autorizado por: {item.autorizadoPor || 'Admin'}
+                              </div>
+                            </td>
                         </tr>
                     ))}
                 </tbody>

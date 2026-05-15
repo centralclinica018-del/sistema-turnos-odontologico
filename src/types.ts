@@ -18,12 +18,16 @@ export interface Dupla {
 export interface Turno {
   id: string;
   fecha: string;
-  tipo: string;
-  idOdontologo: string;
-  nombreO: string;
-  idAsistente: string;
-  nombreA: string;
-  box: string;
-  estadoO: string;
-  estadoA: string;
+  area: string;
+  // Propiedades Dentales (opcionales para servicios)
+  nombreO?: string;
+  nombreA?: string;
+  box?: string;
+  tipo?: string; 
+  idOdontologo?: string;
+  idAsistente?: string;
+  // Propiedades de Servicios (opcionales para dental)
+  nombreFuncionario?: string;
+  motivoCambio?: string;
+  nombreOriginal?: string;
 }

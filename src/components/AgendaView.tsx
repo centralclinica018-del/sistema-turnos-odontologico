@@ -32,7 +32,6 @@ export const AgendaView = ({
   const [fAsig, setFAsig] = useState({ inicio: '2026-05-12', fin: '2026-05-16' });
   const [fT, setFT] = useState({ box: '1', oId: '', aId: '', tipo: 'Ordinario' as any });
   
-  // --- NUEVOS ESTADOS PARA FILTROS ---
   const [filtroO, setFiltroO] = useState('');
   const [filtroA, setFiltroA] = useState('');
 
@@ -42,11 +41,10 @@ export const AgendaView = ({
     return acc;
   }, {});
 
-  // --- LÓGICA DE FILTRADO ---
   const listaTurnos = Object.values(turnosAgrupados)
     .filter(t => {
-      const cumpleO = filtroO === '' || t.idOdontologo === filtroO;
-      const cumpleA = filtroA === '' || t.idAsistente === filtroA;
+      const cumpleO = filtroO === '' || String(t.idOdontologo) === String(filtroO);
+      const cumpleA = filtroA === '' || String(t.idAsistente) === String(filtroA);
       return cumpleO && cumpleA;
     })
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -56,7 +54,7 @@ export const AgendaView = ({
     if (!pNuevo) return;
 
     const idActual = String(t[campoId]);
-    const nombreActual = t[campoNombre];
+    const nombreActual = t[campoNombre] || "Profesional";
     
     if (String(pId) === idActual) return;
 
@@ -115,25 +113,25 @@ export const AgendaView = ({
           </select>
 
           <select style={styles.input} value={fT.oId} onChange={e => {
-            const d = duplas.find(dup => dup.oId === e.target.value);
+            const d = duplas.find(dup => String(dup.oId) === String(e.target.value));
             setFT({...fT, oId: e.target.value, aId: d?.aId || '', box: d?.boxPreferido || '1'});
           }}>
             <option value="">Odontólogo...</option>
-            {personal.filter(p => String(p.rol).includes('Odontólogo')).map(p => (
+            {personal.filter(p => String(p.rol).toLowerCase().includes('odont')).map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
 
           <select style={styles.input} value={fT.aId} onChange={e => setFT({...fT, aId: e.target.value})}>
             <option value="">Asistente...</option>
-            {personal.filter(p => String(p.rol).includes('Asistente')).map(p => (
+            {personal.filter(p => String(p.rol).toLowerCase().includes('asist')).map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
 
           <button onClick={() => {
-             const o = personal.find(p => p.id === fT.oId);
-             const a = personal.find(p => p.id === fT.aId);
+             const o = personal.find(p => String(p.id) === String(fT.oId));
+             const a = personal.find(p => String(p.id) === String(fT.aId));
              if (o && a) {
                asignarTurnoRango(fAsig.inicio, fAsig.fin, { 
                  idOdontologo: o.id, nombreO: o.nombre, idAsistente: a.id, nombreA: a.nombre, box: fT.box, tipo: fT.tipo, esCambio: false 
@@ -145,7 +143,6 @@ export const AgendaView = ({
 
       <div style={{ background: UI.white, borderRadius: '8px', border: `1px solid ${UI.border}`, overflow: 'hidden' }}>
         
-        {/* BARRA DE FILTROS SOBRE LA TABLA */}
         <div style={{ background: '#f1f1f1', padding: '15px', display: 'flex', gap: '15px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>FILTRAR TABLA:</span>
           
@@ -155,7 +152,7 @@ export const AgendaView = ({
             onChange={e => setFiltroO(e.target.value)}
           >
             <option value="">Todos los Odontólogos</option>
-            {personal.filter(p => String(p.rol).includes('Odontólogo')).map(p => (
+            {personal.filter(p => String(p.rol).toLowerCase().includes('odont')).map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
@@ -166,7 +163,7 @@ export const AgendaView = ({
             onChange={e => setFiltroA(e.target.value)}
           >
             <option value="">Todos los Asistentes</option>
-            {personal.filter(p => String(p.rol).includes('Asistente')).map(p => (
+            {personal.filter(p => String(p.rol).toLowerCase().includes('asist')).map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
@@ -205,25 +202,58 @@ export const AgendaView = ({
                     )}
                   </td>
                   <td style={{ padding: '15px' }}>
-                    <div style={{ display: 'flex', gap: '20px' }}>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                      
+                      {/* SELECTOR ODONTÓLOGO REFORZADO */}
                       <select 
-                        value={t.idOdontologo} 
+                        value={String(t.idOdontologo || "")} 
                         onChange={e => manejarCambioConMotivo(t, e.target.value, 'idOdontologo', 'nombreO')}
-                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', color: UI.primary }}
+                        style={{ 
+                          fontSize: '12px', 
+                          fontWeight: 'bold', 
+                          padding: '4px',
+                          borderRadius: '4px',
+                          border: '1px solid #ccc',
+                          backgroundColor: '#fff',
+                          color: UI.primary,
+                          cursor: 'pointer',
+                          minWidth: '140px'
+                        }}
                       >
-                        {personal.filter(p => String(p.rol).includes('Odontólogo')).map(p => (
-                          <option key={p.id} value={p.id}>{p.nombre}</option>
-                        ))}
+                        <option value="">Seleccionar Odont.</option>
+                        {personal
+                          .filter(p => String(p.rol).toLowerCase().includes('odont'))
+                          .map(p => (
+                            <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+                          ))
+                        }
                       </select>
+
+                      {/* SELECTOR ASISTENTE REFORZADO */}
                       <select 
-                        value={t.idAsistente} 
+                        value={String(t.idAsistente || "")} 
                         onChange={e => manejarCambioConMotivo(t, e.target.value, 'idAsistente', 'nombreA')}
-                        style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', background: 'none', color: UI.primary }}
+                        style={{ 
+                          fontSize: '12px', 
+                          fontWeight: 'bold', 
+                          padding: '4px',
+                          borderRadius: '4px',
+                          border: '1px solid #ccc',
+                          backgroundColor: '#fff',
+                          color: UI.primary,
+                          cursor: 'pointer',
+                          minWidth: '140px'
+                        }}
                       >
-                        {personal.filter(p => String(p.rol).includes('Asistente')).map(p => (
-                          <option key={p.id} value={p.id}>{p.nombre}</option>
-                        ))}
+                        <option value="">Seleccionar Asist.</option>
+                        {personal
+                          .filter(p => String(p.rol).toLowerCase().includes('asist'))
+                          .map(p => (
+                            <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+                          ))
+                        }
                       </select>
+
                     </div>
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -234,7 +264,7 @@ export const AgendaView = ({
             ) : (
               <tr>
                 <td colSpan={4} style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
-                  No se encontraron turnos con los filtros seleccionados.
+                  No se encontraron turnos.
                 </td>
               </tr>
             )}

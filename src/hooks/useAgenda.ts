@@ -21,6 +21,9 @@ export const useAgenda = (fInicio: string, fFin: string) => {
   }, []);
 
   const vincularDatos = (lista: Turno[]) => lista.map(t => {
+    // Si el turno no es del área dental, no buscamos duplas para evitar N/A innecesarios
+    if (t.area !== 'DENTAL' && t.area !== undefined) return t;
+
     const d = duplas.find(dup => dup.oId === t.idOdontologo || dup.id === t.idOdontologo);
     return { 
       ...t, 
@@ -37,12 +40,15 @@ export const useAgenda = (fInicio: string, fFin: string) => {
     return personal.map(p => {
       const susTurnos = allTurnos.filter(t => t.idOdontologo === p.id || t.idAsistente === p.id);
       const tipos: Record<string, number> = {};
-      susTurnos.forEach(t => { tipos[t.tipo] = (tipos[t.tipo] || 0) + 1; });
+      susTurnos.forEach(t => { 
+        // MEJORA: Se asegura que t.tipo no sea undefined para evitar error de índice
+        const claveTipo = t.tipo || 'Ordinario';
+        tipos[claveTipo] = (tipos[claveTipo] || 0) + 1; 
+      });
       return { id: p.id, nombre: p.nombre, total: susTurnos.length, tipos };
     });
   }, [personal, allTurnos]);
 
-  // MEJORA: Función para procesar el rango de fechas correctamente
   const asignarTurnoRango = async (inicio: string, fin: string, data: any) => {
     let actual = new Date(inicio + 'T12:00:00');
     const tope = new Date(fin + 'T12:00:00');
@@ -52,8 +58,8 @@ export const useAgenda = (fInicio: string, fFin: string) => {
       await addDoc(collection(db, 'turnos'), {
         ...data,
         fecha: fechaStr,
-        estadoO: 'Presente',
-        estadoA: 'Presente'
+        estadoO: data.area === 'DENTAL' ? 'Presente' : null,
+        estadoA: data.area === 'DENTAL' ? 'Presente' : null
       });
       actual.setDate(actual.getDate() + 1);
     }
@@ -74,6 +80,7 @@ export const useAgenda = (fInicio: string, fFin: string) => {
           const d = listaDuplas[dIdx];
           await addDoc(collection(db, 'turnos'), {
             fecha: fecha.toISOString().split('T')[0],
+            area: 'DENTAL',
             tipo: dia === 6 ? "Fin de Semana" : "Extensión",
             idOdontologo: d.oId,
             nombreO: d.oNombre,
@@ -92,17 +99,32 @@ export const useAgenda = (fInicio: string, fFin: string) => {
 
   return {
     personal, duplas, turnos, turnosAnuales, resumenHistorico, generarAñoCompleto,
-    asignarTurnoRango, // Exportamos la versión corregida
-    registrarStaff: (n: string, r: Rol) => addDoc(collection(db, 'personal'), { nombre: n, rol: r }),
+    asignarTurnoRango,
+    // MEJORA: Soporta tanto strings individuales como objeto (para Servicios)
+    registrarStaff: (p: any, r?: Rol) => {
+      const data = typeof p === 'object' 
+        ? { nombre: p.nombre, rol: p.rol, area: p.area || 'DENTAL' }
+        : { nombre: p, rol: r, area: 'DENTAL' };
+      return addDoc(collection(db, 'personal'), data);
+    },
     eliminarPersonal: (id: string) => deleteDoc(doc(db, 'personal', id)),
     crearDupla: (oI: string, oN: string, aI: string, aN: string, b: string) => 
       addDoc(collection(db, 'duplas'), { oId: oI, oNombre: oN, aId: aI, aNombre: aN, boxPreferido: b }),
-    eliminarDupla: (id: string) => deleteDoc(doc(db, 'duplas', id)),
-    actualizarTurno: (id: string, c: string, v: string) => updateDoc(doc(db, 'turnos', id), { [c]: v }),
+    // MEJORA: Evita error si id es undefined
+    eliminarDupla: (id: string) => id && deleteDoc(doc(db, 'duplas', id)),
+    // MEJORA: Soporta actualizar un campo o un objeto completo (para incidencias)
+    actualizarTurno: (id: string, c: any, v?: any) => {
+      if (typeof c === 'object') {
+        return updateDoc(doc(db, 'turnos', id), c);
+      }
+      return updateDoc(doc(db, 'turnos', id), { [c]: v });
+    },
     eliminarTurno: (id: string) => deleteDoc(doc(db, 'turnos', id)),
     limpiarProgramacionAnual: async () => {
       if(!confirm("¿Borrar todo?")) return;
-      for (const t of allTurnos) { await deleteDoc(doc(db, 'turnos', t.id)); }
+      // MEJORA: Borrado más eficiente
+      const promesas = allTurnos.map(t => deleteDoc(doc(db, 'turnos', t.id)));
+      await Promise.all(promesas);
     }
   };
 };
