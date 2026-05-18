@@ -30,7 +30,7 @@ export const AgendaView = ({
   actualizarTurno, eliminarTurno, asignarTurnoRango 
 }: Props) => {
   const [fAsig, setFAsig] = useState({ inicio: '2026-05-12', fin: '2026-05-16' });
-  const [fT, setFT] = useState({ box: '1', oId: '', aId: '', tipo: 'Ordinario' as any });
+  const [fT, setFT] = useState({ box: '1', oId: '', aId: '', tipo: 'Normal' as any });
   
   const [filtroO, setFiltroO] = useState('');
   const [filtroA, setFiltroA] = useState('');
@@ -106,10 +106,13 @@ export const AgendaView = ({
           <input type="date" value={fAsig.fin} onChange={e => setFAsig({...fAsig, fin: e.target.value})} style={styles.input} />
           
           <select style={styles.input} value={fT.tipo} onChange={e => setFT({...fT, tipo: e.target.value as any})}>
-            <option value="Ordinario">Ordinario</option>
-            <option value="Ético">Ético</option>
-            <option value="Extensión">Extensión</option>
+            <option value="Normal">Normal</option>
+            <option value="Media Jornada">Media Jornada</option>
+            <option value="Apoyo">Apoyo</option>
+            <option value="Urgencia">Urgencia</option>
             <option value="Fin de Semana">Fin de Semana</option>
+            <option value="Cirugia">Cirugia</option>
+            <option value="Periodoncia">Periodoncia</option>
           </select>
 
           <select style={styles.input} value={fT.oId} onChange={e => {
@@ -193,7 +196,10 @@ export const AgendaView = ({
                 <tr key={t.id} style={{ borderBottom: `1px solid ${UI.border}`, background: t.esCambio ? '#fff9f0' : 'none' }}>
                   <td style={{ padding: '15px', fontWeight: 'bold' }}>{t.fecha}</td>
                   <td style={{ padding: '15px' }}>
-                    {t.tipo} <br/><small>Box {t.box}</small>
+                    {/* Normalización visual del tipo de turno en la celda */}
+                    {t.tipo === 'Ordinario' || t.tipo === 'Normal' ? 'Normal' : 
+                     t.tipo === 'Urgenci' || t.tipo === 'Extensión' || t.tipo === 'Urgencia' ? 'Urgencia' : 
+                     t.tipo} <br/><small>Box {t.box}</small>
                     {t.esCambio && (
                       <div style={{ fontSize: '10px', color: '#d35400', marginTop: '5px', padding: '5px', border: '1px dashed #e67e22', borderRadius: '4px' }}>
                         <strong>Motivo:</strong> {t.motivoCambio} <br/>

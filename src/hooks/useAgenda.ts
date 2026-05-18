@@ -21,7 +21,6 @@ export const useAgenda = (fInicio: string, fFin: string) => {
   }, []);
 
   const vincularDatos = (lista: Turno[]) => lista.map(t => {
-    // Si el turno no es del área dental, no buscamos duplas para evitar N/A innecesarios
     if (t.area !== 'DENTAL' && t.area !== undefined) return t;
 
     const d = duplas.find(dup => dup.oId === t.idOdontologo || dup.id === t.idOdontologo);
@@ -41,7 +40,6 @@ export const useAgenda = (fInicio: string, fFin: string) => {
       const susTurnos = allTurnos.filter(t => t.idOdontologo === p.id || t.idAsistente === p.id);
       const tipos: Record<string, number> = {};
       susTurnos.forEach(t => { 
-        // MEJORA: Se asegura que t.tipo no sea undefined para evitar error de índice
         const claveTipo = t.tipo || 'Ordinario';
         tipos[claveTipo] = (tipos[claveTipo] || 0) + 1; 
       });
@@ -100,7 +98,6 @@ export const useAgenda = (fInicio: string, fFin: string) => {
   return {
     personal, duplas, turnos, turnosAnuales, resumenHistorico, generarAñoCompleto,
     asignarTurnoRango,
-    // MEJORA: Soporta tanto strings individuales como objeto (para Servicios)
     registrarStaff: (p: any, r?: Rol) => {
       const data = typeof p === 'object' 
         ? { nombre: p.nombre, rol: p.rol, area: p.area || 'DENTAL' }
@@ -110,19 +107,38 @@ export const useAgenda = (fInicio: string, fFin: string) => {
     eliminarPersonal: (id: string) => deleteDoc(doc(db, 'personal', id)),
     crearDupla: (oI: string, oN: string, aI: string, aN: string, b: string) => 
       addDoc(collection(db, 'duplas'), { oId: oI, oNombre: oN, aId: aI, aNombre: aN, boxPreferido: b }),
-    // MEJORA: Evita error si id es undefined
     eliminarDupla: (id: string) => id && deleteDoc(doc(db, 'duplas', id)),
-    // MEJORA: Soporta actualizar un campo o un objeto completo (para incidencias)
-    actualizarTurno: (id: string, c: any, v?: any) => {
+    
+    actualizarTurno: (id: string, c: any, metaData?: any) => {
       if (typeof c === 'object') {
-        return updateDoc(doc(db, 'turnos', id), c);
+        let payload = { ...c };
+
+        if (metaData && metaData.campo) {
+          const esOdontologo = metaData.campo === 'O';
+          const nuevoNombre = metaData.valorNuevo;
+
+          const profesionalEncontrado = personal.find(p => p.nombre === nuevoNombre);
+          
+          if (esOdontologo) {
+            payload.idOdontologo = profesionalEncontrado ? profesionalEncontrado.id : '';
+          } else {
+            payload.idAsistente = profesionalEncontrado ? profesionalEncontrado.id : '';
+          }
+        }
+
+        return updateDoc(doc(db, 'turnos', id), payload);
       }
-      return updateDoc(doc(db, 'turnos', id), { [c]: v });
+      return updateDoc(doc(db, 'turnos', id), { [c]: metaData });
     },
-    eliminarTurno: (id: string) => deleteDoc(doc(db, 'turnos', id)),
+    
+    // 🛠️ SOLUCIÓN: Limpieza optimista del estado local de turnos para que impacte el histórico en tiempo real
+    eliminarTurno: async (id: string) => {
+      setAllTurnos(prev => prev.filter(t => t.id !== id));
+      return deleteDoc(doc(db, 'turnos', id));
+    },
+    
     limpiarProgramacionAnual: async () => {
       if(!confirm("¿Borrar todo?")) return;
-      // MEJORA: Borrado más eficiente
       const promesas = allTurnos.map(t => deleteDoc(doc(db, 'turnos', t.id)));
       await Promise.all(promesas);
     }

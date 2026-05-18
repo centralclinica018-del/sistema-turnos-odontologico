@@ -70,8 +70,12 @@ export default function App() {
 
         {tab === 'anual' && (
           <AnualView 
-            turnosAnuales={turnosAnuales} duplas={duplas} 
-            generarAñoCompleto={generarAñoCompleto} limpiarProgramacionAnual={limpiarProgramacionAnual} 
+            turnosAnuales={turnosAnuales} 
+            duplas={duplas} 
+            generarAñoCompleto={generarAñoCompleto} 
+            limpiarProgramacionAnual={limpiarProgramacionAnual} 
+            actualizarTurno={actualizarTurno}
+            eliminarTurno={eliminarTurno} // 🛠️ CORREGIDO: Se pasa la función para que borre de verdad en el Plan Anual
           />
         )}
 
